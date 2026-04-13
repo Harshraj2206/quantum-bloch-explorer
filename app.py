@@ -1,432 +1,401 @@
 import streamlit as st
 import numpy as np
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 
-st.set_page_config(
-    page_title="Quantum Bloch Sphere Explorer",
-    page_icon="⚛️",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+st.set_page_config(page_title="Quantum Explorer", page_icon="⚛️", layout="wide")
 
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
 
-html, body, [class*="css"] {
-    font-family: 'Inter', sans-serif;
+html, body, [class*="css"], .stApp {
+    font-family: 'Inter', sans-serif !important;
+    background: #07090f !important;
+    color: #e2e8f0 !important;
+}
+.main .block-container { padding: 2rem 3rem !important; max-width: 1200px !important; }
+#MainMenu, footer, header, .stDeployButton { visibility: hidden; }
+
+.hero { text-align: center; padding: 2.5rem 0 2rem; }
+.hero h1 {
+    font-size: 2.8rem; font-weight: 600; letter-spacing: -0.5px;
+    background: linear-gradient(135deg, #818cf8, #38bdf8, #34d399);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text; margin: 0 0 0.5rem;
+}
+.hero p { color: #475569; font-size: 1rem; margin: 0; }
+
+.card {
+    background: #0d1117; border: 1px solid #1e2636;
+    border-radius: 18px; padding: 1.5rem; margin-bottom: 1rem;
+}
+.card-label {
+    font-size: 0.65rem; font-weight: 600; letter-spacing: 0.12em;
+    text-transform: uppercase; color: #334155; margin-bottom: 1rem;
 }
 
-.main-title {
-    font-size: 2rem;
-    font-weight: 600;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    margin-bottom: 0.25rem;
+.ket {
+    font-family: 'Georgia', serif; font-size: 3.2rem; font-weight: 600;
+    text-align: center; padding: 1.2rem 0;
+    background: linear-gradient(135deg, #818cf8, #38bdf8);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text; line-height: 1;
 }
 
-.subtitle {
-    color: #6b7280;
-    font-size: 1rem;
-    margin-bottom: 2rem;
+.stat-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 1rem; }
+.stat {
+    background: #111827; border: 1px solid #1e2636; border-radius: 12px;
+    padding: 0.85rem; text-align: center;
 }
+.stat-val { font-size: 1.4rem; font-weight: 600; color: #e2e8f0; line-height: 1; margin-bottom: 3px; }
+.stat-key { font-size: 0.65rem; color: #475569; text-transform: uppercase; letter-spacing: 0.1em; }
 
-.state-card {
-    background: linear-gradient(135deg, #f5f7ff 0%, #fff5f8 100%);
-    border: 1px solid #e5e7eb;
-    border-radius: 16px;
-    padding: 1.25rem 1.5rem;
-    margin-bottom: 1rem;
-}
+.prob-bar-wrap { margin-bottom: 0.75rem; }
+.prob-label { display: flex; justify-content: space-between; font-size: 0.8rem; color: #64748b; margin-bottom: 5px; }
+.prob-track { height: 8px; background: #1e2636; border-radius: 99px; overflow: hidden; }
+.prob-fill-0 { height: 100%; border-radius: 99px; background: linear-gradient(90deg, #6366f1, #818cf8); transition: width 0.6s cubic-bezier(0.4,0,0.2,1); }
+.prob-fill-1 { height: 100%; border-radius: 99px; background: linear-gradient(90deg, #ec4899, #f472b6); transition: width 0.6s cubic-bezier(0.4,0,0.2,1); }
 
-.ket-display {
-    font-size: 2.5rem;
-    font-weight: 600;
-    text-align: center;
-    color: #4f46e5;
-    letter-spacing: 2px;
-    padding: 1rem;
-    background: white;
-    border-radius: 12px;
-    border: 1px solid #e0e7ff;
-    margin-bottom: 1rem;
+.gate-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 1rem; }
+.gate-info-box {
+    background: #111827; border-left: 3px solid #818cf8; border-radius: 0 10px 10px 0;
+    padding: 0.85rem 1rem; font-size: 0.82rem; color: #94a3b8; line-height: 1.6;
 }
+.gate-info-box strong { color: #c7d2fe; }
 
-.gate-info {
-    background: #f0f9ff;
-    border-left: 3px solid #0ea5e9;
-    border-radius: 0 8px 8px 0;
-    padding: 0.75rem 1rem;
-    font-size: 0.875rem;
-    color: #0c4a6e;
-    margin-top: 0.75rem;
-    line-height: 1.6;
+.history-wrap { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 0.75rem; align-items: center; }
+.chip {
+    font-size: 0.7rem; font-weight: 600; padding: 3px 10px;
+    border-radius: 99px; border: 1px solid #1e2636;
+    background: #111827; color: #64748b; font-family: monospace;
 }
-
-.metric-box {
-    background: white;
-    border: 1px solid #e5e7eb;
-    border-radius: 10px;
-    padding: 0.75rem 1rem;
-    text-align: center;
-}
-
-.metric-label {
-    font-size: 0.75rem;
-    color: #9ca3af;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-}
-
-.metric-value {
-    font-size: 1.5rem;
-    font-weight: 600;
-    color: #1f2937;
-}
-
-.history-chip {
-    display: inline-block;
-    padding: 2px 10px;
-    border-radius: 99px;
-    background: #f3f4f6;
-    border: 1px solid #e5e7eb;
-    font-size: 0.75rem;
-    font-weight: 500;
-    color: #374151;
-    margin: 2px;
-}
-
-.stButton > button {
-    border-radius: 10px !important;
-    font-weight: 500 !important;
-    transition: all 0.2s !important;
-}
+.chip-arrow { color: #334155; font-size: 0.65rem; }
+.chip-last { border-color: #6366f1; color: #818cf8; background: #1e1b4b; }
+.chip-m { border-color: #ec4899; color: #f472b6; background: #1f0a16; }
 
 .measure-result {
-    padding: 0.75rem 1rem;
-    border-radius: 10px;
-    font-weight: 500;
-    text-align: center;
-    font-size: 0.95rem;
+    text-align: center; padding: 0.85rem; border-radius: 12px;
+    font-size: 1rem; font-weight: 500; margin-top: 0.75rem;
 }
+
+.amp-block {
+    font-family: monospace; font-size: 0.82rem; color: #64748b;
+    background: #111827; border-radius: 10px; padding: 1rem; line-height: 2;
+}
+.amp-block span { color: #a5b4fc; }
+
+.experiment-card {
+    background: #0d1117; border: 1px solid #1e2636; border-radius: 14px;
+    padding: 1rem 1.2rem; height: 100%;
+}
+.experiment-card h4 { font-size: 0.82rem; font-weight: 600; color: #c7d2fe; margin: 0 0 0.4rem; }
+.experiment-card p { font-size: 0.75rem; color: #475569; margin: 0; line-height: 1.5; }
+.experiment-card code { color: #38bdf8; font-size: 0.72rem; }
+
+div[data-testid="stButton"] > button {
+    background: #111827 !important; color: #94a3b8 !important;
+    border: 1px solid #1e2636 !important; border-radius: 10px !important;
+    font-family: 'Inter', sans-serif !important; font-size: 0.85rem !important;
+    font-weight: 500 !important; padding: 0.5rem 0.75rem !important;
+    transition: all 0.2s !important; width: 100% !important;
+}
+div[data-testid="stButton"] > button:hover {
+    background: #1e1b4b !important; border-color: #6366f1 !important;
+    color: #a5b4fc !important; transform: translateY(-1px) !important;
+}
+div[data-testid="stButton"] > button:active { transform: scale(0.97) !important; }
+.reset-btn > button { border-color: #1e2636 !important; color: #475569 !important; }
+.measure-btn > button {
+    background: linear-gradient(135deg, #4f46e5, #7c3aed) !important;
+    border-color: transparent !important; color: #fff !important;
+    font-weight: 600 !important;
+}
+.measure-btn > button:hover { opacity: 0.9 !important; transform: translateY(-1px) !important; }
 </style>
 """, unsafe_allow_html=True)
 
 
-def complex_norm_sq(c):
-    return c.real**2 + c.imag**2
+# ── Quantum math ──────────────────────────────────────────────
+def norm_sq(c): return c.real**2 + c.imag**2
+
+def apply_gate(a, b, g):
+    s2 = 1/np.sqrt(2)
+    M = {"X": [[0,1],[1,0]], "Y": [[0,-1j],[1j,0]], "Z": [[1,0],[0,-1]],
+         "H": [[s2,s2],[s2,-s2]], "S": [[1,0],[0,1j]], "T": [[1,0],[0,np.exp(1j*np.pi/4)]]}
+    v = np.array([a, b], dtype=complex)
+    r = np.array(M[g], dtype=complex) @ v
+    return r[0], r[1]
+
+def state_to_bloch(a, b):
+    th = 2*np.arccos(min(1.0, abs(a)))
+    ph = np.angle(b) - np.angle(a) if abs(a) > 1e-9 else 0.0
+    return th, ph
 
 
-def apply_gate(alpha, beta, gate):
-    sq2 = 1 / np.sqrt(2)
-    gates = {
-        "X": np.array([[0, 1], [1, 0]], dtype=complex),
-        "Y": np.array([[0, -1j], [1j, 0]], dtype=complex),
-        "Z": np.array([[1, 0], [0, -1]], dtype=complex),
-        "H": np.array([[sq2, sq2], [sq2, -sq2]], dtype=complex),
-        "S": np.array([[1, 0], [0, 1j]], dtype=complex),
-        "T": np.array([[1, 0], [0, np.exp(1j * np.pi / 4)]], dtype=complex),
-    }
-    state = np.array([alpha, beta], dtype=complex)
-    new_state = gates[gate] @ state
-    return new_state[0], new_state[1]
-
-
-def state_to_bloch(alpha, beta):
-    a = abs(alpha)
-    b = abs(beta)
-    theta = 2 * np.arccos(min(1.0, a))
-    phi = np.angle(beta) - np.angle(alpha) if abs(alpha) > 1e-9 else 0
-    return theta, phi
-
-
-def draw_bloch_sphere(theta, phi):
-    u = np.linspace(0, 2 * np.pi, 60)
-    v = np.linspace(0, np.pi, 40)
-    x_sphere = np.outer(np.cos(u), np.sin(v))
-    y_sphere = np.outer(np.sin(u), np.sin(v))
-    z_sphere = np.outer(np.ones(np.size(u)), np.cos(v))
-
-    bx = np.sin(theta) * np.cos(phi)
-    by = np.sin(theta) * np.sin(phi)
+# ── Bloch sphere ──────────────────────────────────────────────
+def bloch_figure(theta, phi):
+    bx = np.sin(theta)*np.cos(phi)
+    by = np.sin(theta)*np.sin(phi)
     bz = np.cos(theta)
 
-    t_arrow = np.linspace(0, 1, 30)
-    ax_x = bx * t_arrow
-    ax_y = by * t_arrow
-    ax_z = bz * t_arrow
+    u = np.linspace(0, 2*np.pi, 72)
+    v = np.linspace(0, np.pi,   48)
+    sx = np.outer(np.cos(u), np.sin(v))
+    sy = np.outer(np.sin(u), np.sin(v))
+    sz = np.outer(np.ones(72), np.cos(v))
 
     fig = go.Figure()
 
-    fig.add_trace(go.Surface(
-        x=x_sphere, y=y_sphere, z=z_sphere,
-        opacity=0.08,
-        colorscale=[[0, '#a5b4fc'], [1, '#818cf8']],
-        showscale=False,
-        hoverinfo='skip'
-    ))
+    # sphere shell
+    fig.add_trace(go.Surface(x=sx, y=sy, z=sz, opacity=0.06,
+        colorscale=[[0,"#6366f1"],[1,"#38bdf8"]], showscale=False, hoverinfo="skip",
+        lighting=dict(ambient=1), lightposition=dict(x=0,y=0,z=0)))
 
-    for lat in np.linspace(-np.pi/2, np.pi/2, 5):
-        lx = np.cos(lat) * np.cos(u)
-        ly = np.cos(lat) * np.sin(u)
-        lz = np.full_like(u, np.sin(lat))
-        fig.add_trace(go.Scatter3d(x=lx, y=ly, z=lz, mode='lines',
-            line=dict(color='rgba(99,102,241,0.15)', width=1), hoverinfo='skip', showlegend=False))
+    # latitude & longitude grid lines
+    for lat in np.linspace(-np.pi/2, np.pi/2, 7):
+        cx = np.cos(lat)*np.cos(u); cy = np.cos(lat)*np.sin(u); cz = np.full_like(u, np.sin(lat))
+        fig.add_trace(go.Scatter3d(x=cx, y=cy, z=cz, mode="lines", hoverinfo="skip", showlegend=False,
+            line=dict(color="rgba(99,102,241,0.12)", width=1)))
+    for lon in np.linspace(0, np.pi, 7):
+        lx = np.sin(v)*np.cos(lon); ly = np.sin(v)*np.sin(lon); lz = np.cos(v)
+        fig.add_trace(go.Scatter3d(x=lx, y=ly, z=lz, mode="lines", hoverinfo="skip", showlegend=False,
+            line=dict(color="rgba(99,102,241,0.12)", width=1)))
 
-    for lon in np.linspace(0, np.pi, 6):
-        lx = np.sin(v) * np.cos(lon)
-        ly = np.sin(v) * np.sin(lon)
-        lz = np.cos(v)
-        fig.add_trace(go.Scatter3d(x=lx, y=ly, z=lz, mode='lines',
-            line=dict(color='rgba(99,102,241,0.15)', width=1), hoverinfo='skip', showlegend=False))
+    # equator ring highlight
+    fig.add_trace(go.Scatter3d(x=np.cos(u), y=np.sin(u), z=np.zeros_like(u), mode="lines",
+        hoverinfo="skip", showlegend=False, line=dict(color="rgba(99,102,241,0.3)", width=2)))
 
-    axis_len = 1.3
-    for axi in [
-        dict(x=[0,axis_len],y=[0,0],z=[0,0],name='X'),
-        dict(x=[0,0],y=[0,axis_len],z=[0,0],name='Y'),
-        dict(x=[0,0],y=[0,0],z=[0,axis_len],name='Z'),
+    # axes
+    for ax, col, lbl in [([1.35,0,0],[0,0,0],""), ([0,1.35,0],[0,0,0],""), ([0,0,1.35],[0,0,0],"")]:
+        fig.add_trace(go.Scatter3d(x=[0,ax[0]], y=[0,ax[1]], z=[0,ax[2]], mode="lines",
+            hoverinfo="skip", showlegend=False, line=dict(color="rgba(148,163,184,0.15)", width=1.5)))
+
+    # pole & equator labels
+    for lx,ly,lz,lt,fc in [
+        (0,0,1.22,"|0⟩","#818cf8"), (0,0,-1.22,"|1⟩","#f472b6"),
+        (1.22,0,0,"|+⟩","#38bdf8"), (-1.22,0,0,"|−⟩","#38bdf8"),
     ]:
-        fig.add_trace(go.Scatter3d(
-            x=axi['x'],y=axi['y'],z=axi['z'],mode='lines+text',
-            line=dict(color='rgba(107,114,128,0.4)',width=1.5),
-            text=['',axi['name']],textfont=dict(size=10,color='#9ca3af'),
-            hoverinfo='skip',showlegend=False))
+        fig.add_trace(go.Scatter3d(x=[lx],y=[ly],z=[lz], mode="text",
+            text=[lt], textfont=dict(size=12, color=fc), hoverinfo="skip", showlegend=False))
 
-    labels = [
-        (0,0,1.22,'|0⟩'),(0,0,-1.22,'|1⟩'),
-        (1.22,0,0,'|+⟩'),(-1.22,0,0,'|−⟩'),
-        (0,1.22,0,'|+i⟩'),(0,-1.22,0,'|−i⟩'),
-    ]
-    for lx,ly,lz,lt in labels:
-        fig.add_trace(go.Scatter3d(x=[lx],y=[ly],z=[lz],mode='text',
-            text=[lt],textfont=dict(size=11,color='#6366f1'),
-            hoverinfo='skip',showlegend=False))
+    # state vector line
+    t = np.linspace(0, 1, 60)
+    fig.add_trace(go.Scatter3d(x=bx*t, y=by*t, z=bz*t, mode="lines",
+        line=dict(color="#818cf8", width=6), hoverinfo="skip", showlegend=False))
 
-    fig.add_trace(go.Scatter3d(
-        x=ax_x, y=ax_y, z=ax_z, mode='lines',
-        line=dict(color='#4f46e5', width=5),
-        hoverinfo='skip', showlegend=False, name='State vector'))
+    # arrowhead cone
+    fig.add_trace(go.Cone(x=[bx], y=[by], z=[bz], u=[bx*0.001], v=[by*0.001], w=[bz*0.001],
+        sizemode="absolute", sizeref=0.18, anchor="tip",
+        colorscale=[[0,"#818cf8"],[1,"#818cf8"]], showscale=False, hoverinfo="skip"))
 
-    fig.add_trace(go.Cone(
-        x=[bx], y=[by], z=[bz],
-        u=[bx*0.15], v=[by*0.15], w=[bz*0.15],
-        colorscale=[[0,'#4f46e5'],[1,'#4f46e5']],
-        showscale=False, sizemode='absolute', sizeref=0.12,
-        hoverinfo='skip'))
-
-    fig.add_trace(go.Scatter3d(
-        x=[bx], y=[by], z=[bz], mode='markers',
-        marker=dict(size=9, color='#ec4899', symbol='circle'),
-        hovertemplate=f'θ={np.degrees(theta):.1f}°<br>φ={np.degrees(phi):.1f}°<extra>State point</extra>',
-        name='|ψ⟩'))
-
-    fig.add_trace(go.Scatter3d(
-        x=[0,bx], y=[0,0], z=[0,0], mode='lines',
-        line=dict(color='rgba(100,100,100,0.2)', width=1, dash='dash'),
-        hoverinfo='skip', showlegend=False))
+    # state point glow
+    fig.add_trace(go.Scatter3d(x=[bx], y=[by], z=[bz], mode="markers",
+        marker=dict(size=10, color="#f472b6",
+                    line=dict(color="#fda4af", width=2)),
+        hovertemplate=f"θ = {np.degrees(theta):.1f}°<br>φ = {np.degrees(phi):.1f}°<extra>|ψ⟩</extra>",
+        showlegend=False))
 
     fig.update_layout(
         scene=dict(
-            xaxis=dict(showgrid=False, zeroline=False, showticklabels=False, title=''),
-            yaxis=dict(showgrid=False, zeroline=False, showticklabels=False, title=''),
-            zaxis=dict(showgrid=False, zeroline=False, showticklabels=False, title=''),
-            bgcolor='rgba(0,0,0,0)',
-            aspectmode='cube',
+            xaxis=dict(visible=False), yaxis=dict(visible=False), zaxis=dict(visible=False),
+            bgcolor="rgba(0,0,0,0)", aspectmode="cube",
+            camera=dict(eye=dict(x=1.4, y=1.4, z=0.9))
         ),
-        margin=dict(l=0, r=0, t=0, b=0),
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)',
-        height=400,
-        showlegend=False,
+        paper_bgcolor="rgba(0,0,0,0)", margin=dict(l=0,r=0,t=0,b=0),
+        height=420, showlegend=False,
     )
     return fig
 
 
-def draw_probability_chart(p0, p1):
-    fig = go.Figure()
-    fig.add_trace(go.Bar(
-        x=['|0⟩', '|1⟩'],
-        y=[p0*100, p1*100],
-        marker_color=['#6366f1', '#ec4899'],
-        marker_line_width=0,
-        width=0.45,
-        hovertemplate='%{y:.1f}%<extra></extra>'
-    ))
-    fig.update_layout(
-        yaxis=dict(range=[0, 105], title='Probability (%)', ticksuffix='%',
-                   gridcolor='rgba(0,0,0,0.05)', zeroline=False),
-        xaxis=dict(tickfont=dict(size=16, family='Inter')),
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)',
-        margin=dict(l=10, r=10, t=10, b=10),
-        height=200,
-        bargap=0.4,
-    )
-    return fig
-
-
-GATE_INFO = {
-    "X": "**X gate (Pauli-X / NOT gate):** Flips |0⟩ → |1⟩ and |1⟩ → |0⟩. Equivalent to a classical NOT gate. Rotates the Bloch sphere 180° around the X-axis. Matrix: [[0,1],[1,0]]",
-    "Y": "**Y gate (Pauli-Y):** Applies both a bit-flip and phase-flip. Maps |0⟩ → i|1⟩ and |1⟩ → −i|0⟩. Rotates 180° around the Y-axis. Matrix: [[0,−i],[i,0]]",
-    "Z": "**Z gate (Pauli-Z / phase-flip):** Leaves |0⟩ unchanged but maps |1⟩ → −|1⟩. Doesn't change measurement probability — only phase. Matrix: [[1,0],[0,−1]]",
-    "H": "**H gate (Hadamard):** Creates superposition! |0⟩ → (|0⟩+|1⟩)/√2 and |1⟩ → (|0⟩−|1⟩)/√2. This is the most important gate for quantum algorithms. Matrix: (1/√2)[[1,1],[1,−1]]",
-    "S": "**S gate (Phase gate):** Applies a 90° phase shift to |1⟩. Maps |1⟩ → i|1⟩ while |0⟩ stays unchanged. Matrix: [[1,0],[0,i]]",
-    "T": "**T gate (π/8 gate):** Applies a 45° phase shift. Maps |1⟩ → e^(iπ/4)|1⟩. Used heavily in fault-tolerant quantum computing. Matrix: [[1,0],[0,e^(iπ/4)]]",
+# ── Gate metadata ─────────────────────────────────────────────
+GATES = {
+    "X": {"label":"X  — NOT",   "color":"#6366f1",
+          "info":"<strong>Pauli-X (NOT gate)</strong> — flips |0⟩↔|1⟩. Rotates 180° around X-axis. The quantum equivalent of a classical NOT."},
+    "Y": {"label":"Y  gate",    "color":"#8b5cf6",
+          "info":"<strong>Pauli-Y</strong> — bit-flip + phase-flip. Maps |0⟩→i|1⟩ and |1⟩→−i|0⟩. Rotates 180° around Y-axis."},
+    "Z": {"label":"Z  — Phase", "color":"#3b82f6",
+          "info":"<strong>Pauli-Z (phase-flip)</strong> — leaves |0⟩ unchanged, maps |1⟩→−|1⟩. Rotates 180° around Z-axis. No change to probabilities."},
+    "H": {"label":"H  — Super", "color":"#06b6d4",
+          "info":"<strong>Hadamard</strong> — creates perfect superposition. |0⟩→(|0⟩+|1⟩)/√2. The most important gate in quantum computing."},
+    "S": {"label":"S  gate",    "color":"#10b981",
+          "info":"<strong>S (Phase gate)</strong> — 90° phase rotation. Maps |1⟩→i|1⟩. Equal to two T gates applied together."},
+    "T": {"label":"T  gate",    "color":"#f59e0b",
+          "info":"<strong>T (π/8 gate)</strong> — 45° phase rotation. Maps |1⟩→e^(iπ/4)|1⟩. Essential for universal fault-tolerant quantum computing."},
 }
 
-if 'alpha' not in st.session_state:
-    st.session_state.alpha = complex(1, 0)
-    st.session_state.beta = complex(0, 0)
-    st.session_state.gate_history = []
-    st.session_state.last_gate_info = "Start: qubit is in |0⟩ state. Apply gates using the sidebar to transform it!"
-    st.session_state.measure_result = None
 
-st.markdown('<h1 class="main-title">⚛️ Quantum Bloch Sphere Explorer</h1>', unsafe_allow_html=True)
-st.markdown('<p class="subtitle">Visualize qubits, apply quantum gates, and explore superposition in real time</p>', unsafe_allow_html=True)
+# ── Session state ─────────────────────────────────────────────
+if "alpha" not in st.session_state:
+    st.session_state.alpha   = complex(1, 0)
+    st.session_state.beta    = complex(0, 0)
+    st.session_state.history = []
+    st.session_state.info    = "Qubit is in <strong>|0⟩</strong> — the ground state. Apply a gate from the panel below to transform it."
+    st.session_state.measured = None
 
-with st.sidebar:
-    st.markdown("## 🎛️ Quantum Gates")
-    st.caption("Click a gate to apply it to the current qubit state")
 
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("X  (NOT)", use_container_width=True, type="primary"):
-            st.session_state.alpha, st.session_state.beta = apply_gate(st.session_state.alpha, st.session_state.beta, "X")
-            st.session_state.gate_history.append("X")
-            st.session_state.last_gate_info = GATE_INFO["X"]
-            st.session_state.measure_result = None
-        if st.button("Z  (phase)", use_container_width=True):
-            st.session_state.alpha, st.session_state.beta = apply_gate(st.session_state.alpha, st.session_state.beta, "Z")
-            st.session_state.gate_history.append("Z")
-            st.session_state.last_gate_info = GATE_INFO["Z"]
-            st.session_state.measure_result = None
-        if st.button("S  gate", use_container_width=True):
-            st.session_state.alpha, st.session_state.beta = apply_gate(st.session_state.alpha, st.session_state.beta, "S")
-            st.session_state.gate_history.append("S")
-            st.session_state.last_gate_info = GATE_INFO["S"]
-            st.session_state.measure_result = None
-    with col2:
-        if st.button("Y  gate", use_container_width=True):
-            st.session_state.alpha, st.session_state.beta = apply_gate(st.session_state.alpha, st.session_state.beta, "Y")
-            st.session_state.gate_history.append("Y")
-            st.session_state.last_gate_info = GATE_INFO["Y"]
-            st.session_state.measure_result = None
-        if st.button("H  (super)", use_container_width=True, type="primary"):
-            st.session_state.alpha, st.session_state.beta = apply_gate(st.session_state.alpha, st.session_state.beta, "H")
-            st.session_state.gate_history.append("H")
-            st.session_state.last_gate_info = GATE_INFO["H"]
-            st.session_state.measure_result = None
-        if st.button("T  gate", use_container_width=True):
-            st.session_state.alpha, st.session_state.beta = apply_gate(st.session_state.alpha, st.session_state.beta, "T")
-            st.session_state.gate_history.append("T")
-            st.session_state.last_gate_info = GATE_INFO["T"]
-            st.session_state.measure_result = None
+# ── Header ────────────────────────────────────────────────────
+st.markdown("""
+<div class="hero">
+  <h1>⚛ Quantum Bloch Explorer</h1>
+  <p>Visualise qubits · Apply quantum gates · Explore superposition</p>
+</div>
+""", unsafe_allow_html=True)
 
-    st.divider()
 
-    if st.button("🔄 Reset to |0⟩", use_container_width=True):
-        st.session_state.alpha = complex(1, 0)
-        st.session_state.beta = complex(0, 0)
-        st.session_state.gate_history = []
-        st.session_state.last_gate_info = "State reset to |0⟩. Apply gates to explore!"
-        st.session_state.measure_result = None
-
-    st.divider()
-    st.markdown("## 📐 Measure Qubit")
-    st.caption("Collapses superposition to a definite state")
-    if st.button("⚡ Measure", use_container_width=True, type="secondary"):
-        p0 = complex_norm_sq(st.session_state.alpha)
-        result = "|0⟩" if np.random.random() < p0 else "|1⟩"
-        st.session_state.measure_result = result
-        if result == "|0⟩":
-            st.session_state.alpha = complex(1, 0)
-            st.session_state.beta = complex(0, 0)
-        else:
-            st.session_state.alpha = complex(0, 0)
-            st.session_state.beta = complex(1, 0)
-        st.session_state.gate_history.append("M")
-        st.session_state.last_gate_info = f"Measured! State collapsed to {result}. Quantum superposition ends on observation."
-
-    st.divider()
-    st.markdown("## 📚 About This App")
-    st.caption("Built for Module 2 – Quantum Computing. Demonstrates qubits, Bloch sphere representation, Dirac notation, and single-qubit gate operations as covered in the syllabus.")
-
+# ── Derived state ─────────────────────────────────────────────
 alpha = st.session_state.alpha
-beta = st.session_state.beta
-p0 = complex_norm_sq(alpha)
-p1 = complex_norm_sq(beta)
+beta  = st.session_state.beta
+p0    = norm_sq(alpha)
+p1    = norm_sq(beta)
+p0pct = round(p0 * 100)
+p1pct = round(p1 * 100)
 theta, phi = state_to_bloch(alpha, beta)
 
-col_left, col_right = st.columns([3, 2])
+if p0pct == 100:   ket = "|0⟩"
+elif p1pct == 100: ket = "|1⟩"
+elif p0pct == 50:  ket = "(|0⟩+|1⟩)/√2"
+else:              ket = "|ψ⟩"
 
-with col_left:
-    st.markdown("### 🌐 Bloch Sphere")
-    st.caption("The state vector (blue arrow) points to |0⟩ at north pole, |1⟩ at south pole, and superpositions on the surface")
-    st.plotly_chart(draw_bloch_sphere(theta, phi), use_container_width=True, config={'displayModeBar': False})
+gate_count = len([g for g in st.session_state.history if g != "M"])
 
-with col_right:
-    p0_pct = round(p0 * 100)
-    p1_pct = round(p1 * 100)
 
-    if p0_pct == 100:
-        ket_label = "|0⟩"
-    elif p1_pct == 100:
-        ket_label = "|1⟩"
-    elif p0_pct == 50:
-        ket_label = "|+⟩ or |−⟩"
-    else:
-        ket_label = "|ψ⟩"
+# ── Layout: two columns ───────────────────────────────────────
+col_sphere, col_panel = st.columns([5, 4], gap="large")
 
-    st.markdown(f'<div class="ket-display">{ket_label}</div>', unsafe_allow_html=True)
+with col_sphere:
+    st.markdown('<div class="card"><div class="card-label">Bloch Sphere  ·  drag to rotate</div>', unsafe_allow_html=True)
+    st.plotly_chart(bloch_figure(theta, phi), use_container_width=True,
+                    config={"displayModeBar": False, "scrollZoom": False})
+    st.markdown('</div>', unsafe_allow_html=True)
 
-    m1, m2, m3 = st.columns(3)
-    m1.metric("P(|0⟩)", f"{p0_pct}%")
-    m2.metric("P(|1⟩)", f"{p1_pct}%")
-    m3.metric("Gates applied", len([g for g in st.session_state.gate_history if g != 'M']))
+with col_panel:
 
-    st.markdown("### 📊 Measurement probabilities")
-    st.plotly_chart(draw_probability_chart(p0, p1), use_container_width=True, config={'displayModeBar': False})
+    # KET + stats
+    st.markdown(f"""
+    <div class="card">
+      <div class="card-label">Current State</div>
+      <div class="ket">{ket}</div>
+      <div class="stat-grid">
+        <div class="stat"><div class="stat-val">{p0pct}%</div><div class="stat-key">P(|0⟩)</div></div>
+        <div class="stat"><div class="stat-val">{p1pct}%</div><div class="stat-key">P(|1⟩)</div></div>
+        <div class="stat"><div class="stat-val">{gate_count}</div><div class="stat-key">Gates</div></div>
+      </div>
+      <div class="prob-bar-wrap">
+        <div class="prob-label"><span>|0⟩</span><span>{p0pct}%</span></div>
+        <div class="prob-track"><div class="prob-fill-0" style="width:{p0pct}%"></div></div>
+      </div>
+      <div class="prob-bar-wrap">
+        <div class="prob-label"><span>|1⟩</span><span>{p1pct}%</span></div>
+        <div class="prob-track"><div class="prob-fill-1" style="width:{p1pct}%"></div></div>
+      </div>
+    </div>
+    """, unsafe_allow_html=True)
 
-    if st.session_state.measure_result:
-        color = "#ede9fe" if st.session_state.measure_result == "|0⟩" else "#fce7f3"
-        tc = "#4f46e5" if st.session_state.measure_result == "|0⟩" else "#db2777"
-        st.markdown(f'<div class="measure-result" style="background:{color};color:{tc}">⚡ Measured: {st.session_state.measure_result} — state collapsed!</div>', unsafe_allow_html=True)
+    # Gate info box
+    st.markdown(f"""
+    <div class="card">
+      <div class="card-label">Gate Info</div>
+      <div class="gate-info-box">{st.session_state.info}</div>
+    """, unsafe_allow_html=True)
 
-st.divider()
+    if st.session_state.history:
+        chips = ""
+        for i, g in enumerate(st.session_state.history):
+            is_last = (i == len(st.session_state.history)-1)
+            cls = "chip-m" if g == "M" else ("chip-last" if is_last else "chip")
+            chips += f'<span class="{cls} chip">{g}</span>'
+            if i < len(st.session_state.history)-1:
+                chips += '<span class="chip-arrow">›</span>'
+        st.markdown(f'<div class="history-wrap">{chips}</div>', unsafe_allow_html=True)
 
-col_a, col_b = st.columns(2)
+    if st.session_state.measured:
+        c = "#1e1b4b" if st.session_state.measured == "|0⟩" else "#1f0a16"
+        tc = "#818cf8" if st.session_state.measured == "|0⟩" else "#f472b6"
+        st.markdown(f'<div class="measure-result" style="background:{c};color:{tc}">⚡ Collapsed → {st.session_state.measured}</div>', unsafe_allow_html=True)
 
-with col_a:
-    st.markdown("### 🧮 Qubit state vector")
-    norm_check = round(p0 + p1, 4)
-    ar, ai = round(alpha.real, 4), round(alpha.imag, 4)
-    br, bi = round(beta.real, 4), round(beta.imag, 4)
-    ai_str = f"+{ai}i" if ai >= 0 else f"{ai}i"
-    bi_str = f"+{bi}i" if bi >= 0 else f"{bi}i"
-    st.code(f"|ψ⟩ = α|0⟩ + β|1⟩\n\nα = {ar}{ai_str}\nβ = {br}{bi_str}\n\n|α|² + |β|² = {norm_check} ✓\n\nθ = {round(np.degrees(theta), 2)}°\nφ = {round(np.degrees(phi), 2)}°", language=None)
+    st.markdown('</div>', unsafe_allow_html=True)
 
-with col_b:
-    st.markdown("### 📖 Gate applied")
-    if st.session_state.last_gate_info:
-        st.markdown(f'<div class="gate-info">{st.session_state.last_gate_info}</div>', unsafe_allow_html=True)
 
-    if st.session_state.gate_history:
-        st.markdown("**Gate sequence:**")
-        chips_html = " → ".join([f'<span class="history-chip">{g}</span>' for g in st.session_state.gate_history])
-        st.markdown(chips_html, unsafe_allow_html=True)
+# ── Gate buttons ──────────────────────────────────────────────
+st.markdown('<div class="card"><div class="card-label">Apply a Gate</div>', unsafe_allow_html=True)
 
-st.divider()
-st.markdown("### 🔬 Quick experiments — try these!")
-exp_col1, exp_col2, exp_col3 = st.columns(3)
-with exp_col1:
-    st.info("**Create |+⟩ state**\nReset → Apply H\nResult: 50/50 superposition")
-with exp_col2:
-    st.info("**Phase kickback**\nReset → H → Z → H\nResult: same as X gate!")
-with exp_col3:
-    st.info("**Full rotation**\nApply X → X\nResult: back to |0⟩")
+g1, g2, g3, g4, g5, g6 = st.columns(6, gap="small")
+gate_cols = [g1, g2, g3, g4, g5, g6]
 
-st.markdown("---")
-st.caption("⚛️ Quantum Bloch Sphere Explorer · Built with Streamlit & Plotly · Module 2 – Quantum Computing")
+for col, (gname, gmeta) in zip(gate_cols, GATES.items()):
+    with col:
+        if st.button(gmeta["label"], key=f"btn_{gname}"):
+            st.session_state.alpha, st.session_state.beta = apply_gate(
+                st.session_state.alpha, st.session_state.beta, gname)
+            st.session_state.history.append(gname)
+            st.session_state.info = gmeta["info"]
+            st.session_state.measured = None
+            st.rerun()
+
+st.markdown('</div>', unsafe_allow_html=True)
+
+
+# ── Measure + Reset row ───────────────────────────────────────
+m_col, r_col = st.columns([3, 1], gap="small")
+
+with m_col:
+    st.markdown('<div class="measure-btn">', unsafe_allow_html=True)
+    if st.button("⚡  Measure  —  collapse the qubit state", key="measure"):
+        result = "|0⟩" if np.random.random() < p0 else "|1⟩"
+        st.session_state.measured = result
+        if result == "|0⟩":
+            st.session_state.alpha, st.session_state.beta = complex(1,0), complex(0,0)
+        else:
+            st.session_state.alpha, st.session_state.beta = complex(0,0), complex(1,0)
+        st.session_state.history.append("M")
+        st.session_state.info = f"Measured → <strong>{result}</strong>. Superposition collapsed. The qubit is now in a definite state."
+        st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
+
+with r_col:
+    st.markdown('<div class="reset-btn">', unsafe_allow_html=True)
+    if st.button("↺  Reset  |0⟩", key="reset"):
+        st.session_state.alpha   = complex(1, 0)
+        st.session_state.beta    = complex(0, 0)
+        st.session_state.history = []
+        st.session_state.info    = "Reset to <strong>|0⟩</strong>. Apply gates to explore quantum superposition."
+        st.session_state.measured = None
+        st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
+
+
+# ── Amplitudes ────────────────────────────────────────────────
+ar = round(alpha.real, 4); ai = round(alpha.imag, 4)
+br = round(beta.real, 4);  bi = round(beta.imag, 4)
+ai_s = f"+{ai}i" if ai >= 0 else f"{ai}i"
+bi_s = f"+{bi}i" if bi >= 0 else f"{bi}i"
+norm = round(p0 + p1, 4)
+
+st.markdown(f"""
+<div class="card" style="margin-top:0.5rem">
+  <div class="card-label">State Vector Amplitudes</div>
+  <div class="amp-block">
+    |ψ⟩ = α|0⟩ + β|1⟩<br>
+    α = <span>{ar}{ai_s}</span> &nbsp;&nbsp; β = <span>{br}{bi_s}</span><br>
+    |α|² + |β|² = <span>{norm}</span>  ✓ &nbsp;&nbsp; θ = <span>{round(np.degrees(theta),1)}°</span> &nbsp; φ = <span>{round(np.degrees(phi),1)}°</span>
+  </div>
+</div>
+""", unsafe_allow_html=True)
+
+
+# ── Try these experiments ─────────────────────────────────────
+st.markdown('<div class="card-label" style="margin-top:1rem">Try these experiments</div>', unsafe_allow_html=True)
+e1, e2, e3 = st.columns(3, gap="small")
+for col, title, steps, result in [
+    (e1, "Perfect superposition", "Reset → H", "50/50 chance on measurement"),
+    (e2, "Phase identity", "Reset → H → Z → H", "Same result as X gate!"),
+    (e3, "Full rotation", "Reset → X → X", "Back to |0⟩ — full 360°"),
+]:
+    with col:
+        st.markdown(f"""
+        <div class="experiment-card">
+          <h4>{title}</h4>
+          <p><code>{steps}</code><br>{result}</p>
+        </div>""", unsafe_allow_html=True)
+
+st.markdown('<p style="text-align:center;color:#1e293b;font-size:0.75rem;margin-top:2.5rem">⚛ Quantum Bloch Explorer · Module 2 Quantum Computing</p>', unsafe_allow_html=True)
